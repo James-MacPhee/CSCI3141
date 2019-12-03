@@ -1,0 +1,105 @@
+---
+title: "CSCI3141 - Assignment #1"
+author: "James MacPhee - B00768516 | Ryan Sawchuk - B00787509"
+output: html_notebook
+---
+------
+Part 1
+------
+```{r}
+library(readr)
+library(dplyr)
+
+names <- read_delim("https://archive.ics.uci.edu/ml/machine-learning-databases/adult/adult.names", delim = ":", skip=96)
+names <- c("age", names$age, "income")
+data <- read_csv("https://archive.ics.uci.edu/ml/machine-learning-databases/adult/adult.data", col_names=names)
+```
+------
+Part 2
+------
+```{r}
+print(sprintf("%i rows & %i columns", nrow(data), ncol(data)))
+data[data == '?'] <- NA #The adult.names file described how they replaced unknown values with '?'
+missings <- vector('numeric')
+for(i in apply(is.na(data), 2, which)){
+  if(length(i)>1){
+    missings <- c(missings, length(i))
+  }
+}
+print("Columns that have missing values:")
+colnames(data)[colSums(is.na(data)) > 0]
+print("Number of rows with missing entries respectively:")
+print(missings)
+print(sprintf("# of rows with missing values: %i", nrow(data[!complete.cases(data),])))
+
+#Removing rows with NA entries
+data <- na.omit(data)
+
+#Adding disc_hours
+data$disc_hours <- cut(data$`hours-per-week`, 4)
+
+#Adding native_region
+asia <- c("Cambodia", "China", "Hong", "Laos", "Thailand", "Philippines",
+               "Japan", "Taiwan", "Vietnam", "India", "Iran", "South")
+
+america <- c("Cuba", "Guatemala", "Jamaica", "Nicaragua", "Outlying-US(Guam-USVI-etc)", 
+                     "Puerto-Rico",  "Dominican-Republic", "El-Salvador", "Canada", "Haiti", 
+                     "Honduras", "Mexico", "Trinadad&Tobago", "Ecuador", "Peru", "Columbia", "United-States")
+
+europe <- c("England", "Germany", "Holand-Netherlands", "Ireland", 
+                 "France", "Greece", "Italy", "Portugal", "Scotland", "Poland", "Yugoslavia", "Hungary")
+
+data <- mutate(data, native_region = ifelse(`native-country` %in% asia, "Asia",
+                ifelse(`native-country` %in% america, "America", "Europe")))
+```
+------
+Part 3
+------
+How many cases are registered for each income group?
+
+```{r}
+data %>% group_by(income) %>% summarize(n())
+```
+
+
+Show the total number of cases by workclass and income.
+
+```{r}
+data %>% group_by(workclass, income) %>% summarize(n())
+```
+
+
+Obtain the same totals by sex and income.
+
+```{r}
+data %>% group_by(sex, income) %>% summarize(n())
+```
+
+
+What is the average education_num by occupation?
+
+```{r}
+data %>% group_by(occupation) %>% summarise_at("education-num", funs(mean(., na.rm = T)))
+```
+
+
+What is the average number of hours per week by education type?
+
+```{r}
+data %>% group_by(education) %>% summarise_at("hours-per-week", funs(mean(., na.rm = T)))
+```
+
+
+Which are the top 3 occupations with larger number of cases?
+
+```{r}
+data %>% group_by(occupation) %>% summarise(n()) %>% top_n(3)
+```
+
+
+How is the income distributed by native region?
+
+```{r}
+data %>% group_by(native_region, income) %>% summarize(n())
+```
+

@@ -1,0 +1,368 @@
+---
+title: "CSCI 3141   Assignment 2    Group 11"
+output: html_notebook
+date: "October 16, 2019"
+authors: "James MacPhee - B00768516 | Ryan Sawchuk - B00787509"
+---
+
+
+Part 1 - Loading the Data
+
+Two options are provided. The first one checks requirnments for the assignment, the second one only reads the data into a data frame.
+
+The following R script determines if the required packages and data sets have been sucessfully loaded. If any packages have not yet been installed, the script will install and load the packages. If any required data sets has not been loaded the, script will retreive them from the host url and load the data into a dataframe.
+
+```{r}
+
+if ("zip" %in% rownames(installed.packages()) == F) {
+  print("Installing the zip package.")
+  install.packages("zip")
+  library(zip)
+} else {
+  print("zip package already installed.")
+  library(zip)
+}
+
+if ("dplyr" %in% rownames(installed.packages()) == F) {
+  print("Installing the dplyr package.")
+  install.packages("dplyr")
+  library(dplyr)
+} else {
+  print("dplyr package already installed.")
+  library(dplyr)
+}
+
+if ("ggplot2" %in% rownames(installed.packages()) == F) {
+  print("Installing the ggplot2 package.")
+  install.packages("ggplot2")
+  library(ggplot2)
+} else {
+  print("ggplot2 package already installed.")
+  library(ggplot2)
+}
+
+if ("readr" %in% rownames(installed.packages()) == F) {
+  print("Installing the readr package.")
+  install.packages("readr")
+  library(readr)
+} else {
+  print("readr package already installed.")
+  library(readr)
+}
+
+source.url <- "https://archive.ics.uci.edu/ml/machine-learning-databases/00222/bank-additional.zip"
+
+if (file.exists("bank-additional")) {
+  print("File already downloaded.")
+} else {
+  print("Downloading file.")
+  download.file(source.url, "zipped_folder.zip")
+
+  unzip("zipped_folder.zip", 
+          c("bank-additional/bank-additional-full.csv",
+            "bank-additional/bank-additional-names.txt",
+            "bank-additional/bank-additional.csv"))
+
+  if (file.exists("zipped_folder.zip"))
+    file.remove("zipped_folder.zip")
+  
+  bank.data <- read.table("bank-additional/bank-additional-full.csv", header = T, ";", na.strings = "unknown")
+
+}
+
+data <- bank.data
+
+```
+
+Question #1 - Second Option
+
+```{r}
+
+library(dplyr)
+
+data <- read.csv("bank-additional-full.csv", sep=";", na.strings = "unknown")
+bank.data <- data
+```
+
+
+
+Part 2 - Pre-processing and exploration of data set characteristics
+
+
+a) 
+
+The summary function prives a clean statistcal summary of the data set. 
+
+```{r}
+
+summary(bank.data)
+
+```
+
+
+b)
+
+I choose to change those values upon reading in the data above to NA 
+
+```{r}
+library(DMwR2)
+bank.data <- centralImputation(data)
+```
+
+
+c)
+
+I choose to write a function that sorts a numeric age value into an respective age catagory. I then use the sapply function to iterativly apply my sorting function to each element in the bank.data $ age column. The results are then added as a new column cat_age to the bank.data dataframe.
+
+
+```{r}
+
+sort.age <- function(age) {
+  
+  if (age < 19)
+    return("youth")
+  
+  else if (19 <= age && age < 35)
+    return("young adult")
+  
+  else if (35 <= age  && age < 60)
+    return("adult")
+  
+  else
+    return("senior")
+}
+
+bank.data$Cat_age <- sapply(bank.data$age, function(age) sort.age(age))
+data <- bank.data
+bank.data %>% group_by(Cat_age) %>% summarize(n())
+
+```
+
+
+I choose to write a function that sorts a string value into an respective client catagory. I then use the sapply function to iterativly apply my sorting function to each element in the bank.data $ poutcome column. The results are then added as a new column client_newold to the bank.data dataframe.
+
+```{r}
+
+sort.client <- function(client) {
+  if (client == "nonexistent")
+    return("new")
+  
+  else
+    return("old")
+}
+
+bank.data$Client_NewOld <- sapply(bank.data$poutcome, function(client) sort.client(client))
+data <- bank.data
+bank.data %>% group_by(Client_NewOld) %>% summarize(n())
+```
+
+d)
+
+```{r}
+
+by(bank.data$age, bank.data$job, summary)
+
+```
+
+
+e)
+
+```{r}
+
+temp <- unique(bank.data$month)
+temp[which.max(tabulate(match(bank.data$month, temp)))]
+
+```
+
+f)
+
+```{r}
+
+mean(bank.data$duration)
+median(bank.data$duration)
+var(bank.data$duration)
+IQR(bank.data$duration)
+
+```
+
+
+g)
+
+```{r}
+
+bank.data %>% group_by(y, Cat_age) %>% summarise(averageCampaign = mean(campaign))
+
+```
+
+
+h)
+
+```{r}
+
+bank.data %>% group_by(marital, education) %>% count(marital) %>% arrange(desc(n))
+
+```
+
+
+i)
+Since none of the days has the majority of that days contacts made from persons with marital status of 'single' - 
+we're assuming the question is asking what are the top three days for the 'single' status
+```{r}
+
+bank.data %>% group_by(day_of_week) %>% filter(marital=='single') %>% count(marital) %>% arrange(desc(n)) %>% head(3)
+
+```
+
+j) 
+
+```{r}
+
+getOutliers <- function(x){
+  qnt<- quantile(x)
+  rng <- 1.5*IQR(x)
+  temp <- x[x < qnt[1]-rng]
+  return(c(temp, x[x > qnt[2]+rng]))
+}
+outliers <- getOutliers(bank.data$campaign)
+length(outliers)
+
+```
+
+
+k)
+
+```{r}
+
+outliers <- getOutliers(bank.data$age)
+summary(outliers)
+
+```
+
+
+l)
+
+```{r}
+
+bank.data %>% group_by(Client_NewOld,  Cat_age) %>% filter(euribor3m > 1.5) %>% summarise(campaignOutliers = length(getOutliers(campaign)))
+
+```
+
+m)
+
+```{r}
+
+summary(bank.data$job)
+barplot(table(bank.data$job), las=2)
+
+```
+
+
+n) 
+
+```{r}
+
+barplot(table(bank.data$y, bank.data$job), las=2, beside = T)
+
+```
+
+o)
+
+
+```{r}
+
+library(ggplot2)
+
+ggplot(bank.data, aes(x = age)) + geom_density(aes(color = default))
+
+```
+
+
+p)
+
+I choose to use a histogram and distribution plot to show the amount of duration and its associated distribution. As we can see from the graph, the data has a heavy skew to the right. For a normal distribution, the max must be relatively centered and must be symetric on both sides. The duration column is clearly not normally distributed.
+
+```{r}
+
+hist(bank.data$duration, probability = T, col = 8) 
+lines(density(bank.data$duration), col = 2)
+
+```
+
+q)
+
+```{r}
+
+ggplot(bank.data, aes(x = bank.data$Client_NewOld, y = bank.data$duration)) + geom_boxplot() + facet_wrap(~ bank.data$y)
+
+```
+
+
+
+Part 3 - Exploring further characteristics of the Bank Marketing Data
+
+The following examples are inspired by observations ive made outside of this assigment; Ive decided to explore them futher with an actual data set. 
+
+
+1.  Relations between age, education and loan
+
+This graph utalizes the ggplot package. We can compare peoples ages to their level of education. We then procede to group this data based off of if they have a loan. The facet_wrap function allows us to display the different groups on the same graph allowing for easy visual comparisons.
+
+
+```{r}
+
+ggplot(bank.data, aes(x = bank.data$age, y = bank.data$education)) +
+  geom_violin() + facet_wrap(~ bank.data$loan)
+
+```
+
+
+2. Interesting characteristics between method of contact and age
+
+Using ggplot and the geom_jitter function we can map out the method of contact used for each age.
+
+Observations:
+
+I found it supprising that elders (60+) primarily use cullular phones over telephones. I expected that very few elders used mobile devices and would prefer home telephones. I expected from past observations that most elderly people stick with the technology they grew up with. The data shows the opposite.
+
+
+
+
+```{r}
+
+ggplot(bank.data, aes(x = contact, y = age)) + geom_jitter()
+
+```
+
+
+3. Relations between housing and marital status
+
+We use the barplot function with the "beside" modifier to create a clean visual dispaly of marital status and housing.
+
+Observations:
+
+I expected that married people would primarily occupy the housing catigory given that a house is a fairly long term and expensive purchase, better suited for marriges. On the other hand, single or devorced people would mainly occupy the non-housing section.
+
+By graphing the relations it is evident that the marriage does not a heavy factor for owning a house. The number of people who own a house that are married is very close to the amount of people who are not married and own a house. There are slightly more people who are married that own houses.
+
+```{r}
+
+barplot(table(data$marital, data$housing), las=2, beside = T)
+
+```
+
+
+4. Desnity of the constant price index per month
+
+We use ggplot and the geom_density modifier to display the density of the constant price index for each month.
+
+Observations:
+
+The constant price index value of ~92.75 spikes in the month of december.
+The constant price index for september has so much variation that vary few values repeat themselves. 
+
+```{r}
+
+ggplot(bank.data, aes(x = cons.price.idx)) + geom_density(aes(color = month))
+
+```
+
